@@ -19,35 +19,55 @@ namespace LibraryWebAPI.Controllers
         [HttpGet]
         public async Task<IActionResult> GetBooks()
         {
-            return Ok(await _context.Books.ToListAsync());
+            var books = await _context.Books
+                .FromSqlRaw("CALL SP_GetAllBooks()")
+                .ToListAsync();
+
+            return Ok(books);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetBook(int id)
+        {
+            var books = await _context.Books
+                .FromSqlRaw("CALL SP_GetBookById({0})", id)
+                .ToListAsync();
+
+            var book = books.FirstOrDefault();
+
+            if (book == null)
+                return NotFound();
+
+            return Ok(book);
         }
 
         [HttpPost]
         public async Task<IActionResult> CreateBook(Book book)
         {
-            _context.Books.Add(book);
-            await _context.SaveChangesAsync();
+            await _context.Database.ExecuteSqlRawAsync(
+                "CALL AddBook({0},{1},{2},{3},{4})",
+                book.Title,
+                book.Author,
+                book.ISBN,
+                book.PublishedYear,
+                book.CopiesAvailable
+            );
+
             return Ok(book);
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateBook(int id, Book book)
         {
-            if (id != book.ID)
-                return BadRequest();
-
-            var existingBook = await _context.Books.FindAsync(id);
-
-            if (existingBook == null)
-                return NotFound();
-
-            existingBook.Title = book.Title;
-            existingBook.Author = book.Author;
-            existingBook.ISBN = book.ISBN;
-            existingBook.PublishedYear = book.PublishedYear;
-            existingBook.CopiesAvailable = book.CopiesAvailable;
-
-            await _context.SaveChangesAsync();
+            await _context.Database.ExecuteSqlRawAsync(
+                "CALL UpdateBook({0},{1},{2},{3},{4},{5})",
+                id,
+                book.Title,
+                book.Author,
+                book.ISBN,
+                book.PublishedYear,
+                book.CopiesAvailable
+            );
 
             return NoContent();
         }
@@ -55,13 +75,10 @@ namespace LibraryWebAPI.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteBook(int id)
         {
-            var book = await _context.Books.FindAsync(id);
-
-            if (book == null)
-                return NotFound();
-
-            _context.Books.Remove(book);
-            await _context.SaveChangesAsync();
+            await _context.Database.ExecuteSqlRawAsync(
+                "CALL SP_DeleteBook({0})",
+                id
+            );
 
             return NoContent();
         }
