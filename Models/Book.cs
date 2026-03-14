@@ -2,10 +2,8 @@
 
 namespace LibraryWebAPI.Models
 {
-    public class Book
+    public class BookBase
     {
-        public int ID { get; set; }
-
         [Required]
         [MaxLength(200)]
         public string Title { get; set; } = null!;
@@ -21,5 +19,9 @@ namespace LibraryWebAPI.Models
         public int PublishedYear { get; set; }
 
         public int CopiesAvailable { get; set; }
+    }
+    public class Book : BookBase
+    {
+        public int ID { get; set; }
     }
 }

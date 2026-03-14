@@ -3,6 +3,7 @@ using LibraryWebAPI.Validators;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore;
+using LibraryWebAPI.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +15,9 @@ builder.Services.AddControllers()
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// custom service registration
+builder.Services.AddScoped<BookService>();
 
 // MySQL DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>

@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using LibraryWebAPI.Data;
 using LibraryWebAPI.Models;
+using LibraryWebAPI.Services;
 
 namespace LibraryWebAPI.Controllers
 {
@@ -10,10 +11,12 @@ namespace LibraryWebAPI.Controllers
     public class BooksController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly BookService _bookService;
 
-        public BooksController(AppDbContext context)
+        public BooksController(AppDbContext context, BookService bookService)
         {
             _context = context;
+            this._bookService = bookService;
         }
 
         [HttpGet]
@@ -42,18 +45,10 @@ namespace LibraryWebAPI.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateBook(Book book)
+        public async Task<IActionResult> CreateBook(BookBase book)
         {
-            await _context.Database.ExecuteSqlRawAsync(
-                "CALL AddBook({0},{1},{2},{3},{4})",
-                book.Title,
-                book.Author,
-                book.ISBN,
-                book.PublishedYear,
-                book.CopiesAvailable
-            );
-
-            return Ok(book);
+           var _book=await _bookService.CreateBook(book);
+            return Ok(_book);
         }
 
         [HttpPut("{id}")]
