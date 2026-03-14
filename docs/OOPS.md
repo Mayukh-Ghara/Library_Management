@@ -44,3 +44,5 @@ getting idea for repository pattern
 fleunt validation
 usage of automapper
 cqrs
+---
+
