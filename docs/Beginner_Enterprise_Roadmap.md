@@ -59,6 +59,13 @@
   - Replace raw SQL with ORM queries, perform migrations
 
 
+### 9. Authentication & Authorization
+- Learn the basics of authentication (verifying user identity) and authorization (controlling access)
+  - Understand concepts like login, logout, registration, and user roles
+  - Implement simple authentication in your app (e.g., cookie-based, JWT, or ASP.NET Identity)
+  - Add role-based or permission-based access control to restrict certain actions or endpoints
+  - Explore libraries/frameworks for authentication (e.g., ASP.NET Core Identity, OAuth)
+
 ### 10. Soft Skills
 - Communication
   - Practice explaining technical concepts simply (to friends or in interviews)
