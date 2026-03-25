@@ -1,11 +1,35 @@
-using LibraryWebAPI.Data;
-using LibraryWebAPI.Validators;
+using System.Text;
 using FluentValidation;
 using FluentValidation.AspNetCore;
-using Microsoft.EntityFrameworkCore;
+using LibraryWebAPI.Data;
 using LibraryWebAPI.Services;
+using LibraryWebAPI.Validators;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+var key = "ThisIsMySuperSecretKey1234567ThisIsMySuperSecretKey1234567";
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = false,
+        ValidateAudience = false,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key))
+    };
+});
+
+builder.Services.AddTransient<IJwtService, JwtService>();
+builder.Services.AddAuthorization();
 
 // Add Controllers + FluentValidation
 builder.Services.AddControllers()
@@ -16,10 +40,7 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// custom service registration
-builder.Services.AddScoped<BookService>();
-
-// MySQL DbContext
+// ? EF Core — used by BookService
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(
         builder.Configuration.GetConnectionString("DefaultConnection"),
@@ -28,9 +49,15 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         )
     ));
 
+// ? ADO.NET — used by UserService
+builder.Services.AddSingleton<UserDbContext>();   // ADD THIS
+
+// Services
+builder.Services.AddScoped<BookService>();
+builder.Services.AddScoped<UserService>();
+
 var app = builder.Build();
 
-// Middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -38,9 +65,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
+app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();

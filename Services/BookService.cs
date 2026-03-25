@@ -1,4 +1,5 @@
-﻿using LibraryWebAPI.Models;
+﻿using LibraryWebAPI.Data;
+using LibraryWebAPI.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,11 +7,11 @@ namespace LibraryWebAPI.Services
 {
     public class BookService
     {
-        private readonly DbContext _context;
+        private readonly AppDbContext _context;
 
-        public BookService(DbContext dbContext)
+        public BookService(AppDbContext appdbContext)
         {
-            this._context = dbContext;
+            this._context = appdbContext;
         }
         public async Task<Book> CreateBook(BookBase book)
         {
