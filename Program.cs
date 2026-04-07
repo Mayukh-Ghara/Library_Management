@@ -1,5 +1,4 @@
 using System.Text;
-using FluentValidation;
 using FluentValidation.AspNetCore;
 using LibraryWebAPI.Data;
 using LibraryWebAPI.Services;
@@ -8,64 +7,80 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
-var builder = WebApplication.CreateBuilder(args);
-var key = "ThisIsMySuperSecretKey1234567ThisIsMySuperSecretKey1234567";
-
-builder.Services.AddAuthentication(options =>
+internal class Program
 {
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
+    private static void Main(string[] args)
     {
-        ValidateIssuer = false,
-        ValidateAudience = false,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key))
-    };
-});
+        var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddTransient<IJwtService, JwtService>();
-builder.Services.AddAuthorization();
+        // Load configuration values
+        var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+        var jwtKey = builder.Configuration["Jwt:Key"];
 
-// Add Controllers + FluentValidation
-builder.Services.AddControllers()
-    .AddFluentValidation(fv =>
-        fv.RegisterValidatorsFromAssemblyContaining<BookValidator>());
+        if (string.IsNullOrEmpty(connectionString))
+            throw new Exception("Database connection string is missing.");
 
-// Swagger
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+        if (string.IsNullOrEmpty(jwtKey))
+            throw new Exception("JWT Key is missing.");
 
-// ? EF Core — used by BookService
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseMySql(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
-        ServerVersion.AutoDetect(
-            builder.Configuration.GetConnectionString("DefaultConnection")
-        )
-    ));
+        // JWT Authentication
+        builder.Services.AddAuthentication(options =>
+        {
+            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        })
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = false,
+                ValidateAudience = false,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+            };
+        });
 
-// ? ADO.NET — used by UserService
-builder.Services.AddSingleton<UserDbContext>();   // ADD THIS
+        builder.Services.AddAuthorization();
 
-// Services
-builder.Services.AddScoped<BookService>();
-builder.Services.AddScoped<UserService>();
+        // Controllers + FluentValidation
+        builder.Services.AddControllers()
+            .AddFluentValidation(fv =>
+                fv.RegisterValidatorsFromAssemblyContaining<BookValidator>());
 
-var app = builder.Build();
+        // Swagger
+        builder.Services.AddEndpointsApiExplorer();
+        builder.Services.AddSwaggerGen();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
+        // EF Core (MySQL)
+        builder.Services.AddDbContext<AppDbContext>(options =>
+            options.UseMySql(
+                connectionString,
+                ServerVersion.AutoDetect(connectionString)
+            ));
+
+        // ADO.NET (if needed)
+        builder.Services.AddSingleton<UserDbContext>();
+
+        // Services
+        builder.Services.AddScoped<BookService>();
+        builder.Services.AddScoped<UserService>();
+        builder.Services.AddTransient<IJwtService, JwtService>();
+
+        var app = builder.Build();
+
+        if (app.Environment.IsDevelopment())
+        {
+            app.UseSwagger();
+            app.UseSwaggerUI();
+        }
+
+        app.UseHttpsRedirection();
+        app.UseAuthentication();
+        app.UseAuthorization();
+
+        app.MapControllers();
+
+        app.Run();
+    }
 }
-
-app.UseHttpsRedirection();
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-app.Run();
