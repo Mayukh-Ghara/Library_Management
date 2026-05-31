@@ -33,7 +33,7 @@ namespace LibraryWebAPI.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetBook(int id)
         {
-            var books = await _context.Books
+            List<Book> books = await _context.Books
                 .FromSqlRaw("CALL SP_GetBookById({0})", id)
                 .ToListAsync();
 

@@ -15,7 +15,8 @@ internal class Program
 
         // Load configuration values
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-        var jwtKey = builder.Configuration["Jwt:Key"];
+        // CORRECT: Matching exactly what JwtService uses!
+        var jwtKey = builder.Configuration["JwtSettings:SecretKey"];
 
         if (string.IsNullOrEmpty(connectionString))
             throw new Exception("Database connection string is missing.");
@@ -59,13 +60,29 @@ internal class Program
                 ServerVersion.AutoDetect(connectionString)
             ));
 
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy("AllowAngularApp", policy =>
+            {
+                policy.WithOrigins("http://localhost:4200") // Trust your Angular dev server
+                      .AllowAnyHeader()
+                      .AllowAnyMethod();
+            });
+        });
+
         // ADO.NET (if needed)
         builder.Services.AddSingleton<UserDbContext>();
+
+        // HTTP Context for token extraction
+        builder.Services.AddHttpContextAccessor();
 
         // Services
         builder.Services.AddScoped<BookService>();
         builder.Services.AddScoped<UserService>();
         builder.Services.AddTransient<IJwtService, JwtService>();
+        builder.Services.AddScoped<ReviewService>();
+        builder.Services.AddScoped<BorrowingService>();
+        builder.Services.AddScoped<IUsrTokenContext, UsrTokenContext>();
 
         var app = builder.Build();
 
@@ -76,9 +93,20 @@ internal class Program
         }
 
         app.UseHttpsRedirection();
+
+        // 1. First, figure out where the request is going
+        app.UseRouting();
+
+        // 2. Next, apply the CORS policy so Angular is allowed to talk to it
+        app.UseCors("AllowAngularApp");
+
+        // 3. Then identify WHO the user is
         app.UseAuthentication();
+
+        // 4. Finally, check WHAT they are allowed to do (Authorization)
         app.UseAuthorization();
 
+        // 5. Map the request to the correct Controller
         app.MapControllers();
 
         app.Run();

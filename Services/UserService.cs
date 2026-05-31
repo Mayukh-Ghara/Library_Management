@@ -49,13 +49,6 @@ public class UserService
         return await conn.QueryFirstOrDefaultAsync<User>(sql, new { Email = email });
     }
 
-    public async Task<User?> GetByUsernameAsync(string username)
-    {
-        var sql = $"{BaseSelect} WHERE username = @Username";
-        using var conn = CreateConnection();
-        return await conn.QueryFirstOrDefaultAsync<User>(sql, new { Username = username });
-    }
-
     public async Task<int> CreateAsync(User user)
     {
         const string sql = """

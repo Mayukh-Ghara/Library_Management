@@ -1,8 +1,7 @@
-﻿using Dapper;
-using LibraryWebAPI.Models;
+﻿using LibraryWebAPI.Models;
+using LibraryWebAPI.DTOs; 
 using LibraryWebAPI.Services;
 using Microsoft.AspNetCore.Mvc;
-using Org.BouncyCastle.Crypto.Generators;
 
 namespace LibraryWebAPI.Controllers;
 
@@ -19,15 +18,16 @@ public class UsersController : ControllerBase
         _logger = logger;
     }
 
-    // GET api/users
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
         var users = await _userService.GetAllAsync();
-        return Ok(users);
+
+        // Map domain items to Response DTOs safely skipping password hashes
+        var response = users.Select(u => MapToResponseDto(u));
+        return Ok(response);
     }
 
-    // GET api/users/5
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -37,23 +37,31 @@ public class UsersController : ControllerBase
             _logger.LogWarning("User with ID {Id} not found.", id);
             return NotFound(new { message = $"User with ID {id} not found." });
         }
-        return Ok(user);
+        return Ok(MapToResponseDto(user));
     }
 
-    // POST api/users
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] User user)
+    public async Task<IActionResult> Create([FromBody] RegisterDto dto)
     {
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        // Check if email already exists
-        var existing = await _userService.GetByEmailAsync(user.Email);
+        var existing = await _userService.GetByEmailAsync(dto.Email);
         if (existing is not null)
             return Conflict(new { message = "A user with this email already exists." });
 
-        // Hash password before storing
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(user.PasswordHash);
+        // Build User Object safely mapping inbound plain password to hashed equivalent
+        var user = new User
+        {
+            Username = dto.Username,
+            Email = dto.Email,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+            FirstName = dto.FirstName,
+            LastName = dto.LastName,
+            Phone = dto.Phone,
+            IsActive = true,
+            Role = "user"
+        };
 
         var newId = await _userService.CreateAsync(user);
 
@@ -61,9 +69,8 @@ public class UsersController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = newId }, new { id = newId });
     }
 
-    // PUT api/users/5
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(int id, [FromBody] User user)
+    public async Task<IActionResult> Update(int id, [FromBody] UserUpdateDto dto)
     {
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
@@ -75,10 +82,16 @@ public class UsersController : ControllerBase
             return NotFound(new { message = $"User with ID {id} not found." });
         }
 
-        user.Id = id;
-        user.PasswordHash = existing.PasswordHash; // Prevent overwriting password on update
+        // Maintain password hash from existing record
+        existing.Username = dto.Username;
+        existing.Email = dto.Email;
+        existing.FirstName = dto.FirstName;
+        existing.LastName = dto.LastName;
+        existing.Phone = dto.Phone;
+        existing.IsActive = dto.IsActive;
+        existing.Role = dto.Role;
 
-        var updated = await _userService.UpdateAsync(user);
+        var updated = await _userService.UpdateAsync(existing);
         if (!updated)
             return StatusCode(500, new { message = "Update failed unexpectedly." });
 
@@ -86,26 +99,20 @@ public class UsersController : ControllerBase
         return NoContent();
     }
 
-    // DELETE api/users/5
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
         var existing = await _userService.GetByIdAsync(id);
         if (existing is null)
-        {
-            _logger.LogWarning("Delete failed. User with ID {Id} not found.", id);
             return NotFound(new { message = $"User with ID {id} not found." });
-        }
 
         var deleted = await _userService.DeleteAsync(id);
         if (!deleted)
             return StatusCode(500, new { message = "Delete failed unexpectedly." });
 
-        _logger.LogInformation("User with ID {Id} deleted.", id);
         return NoContent();
     }
 
-    // PATCH api/users/5/deactivate
     [HttpPatch("{id:int}/deactivate")]
     public async Task<IActionResult> Deactivate(int id)
     {
@@ -116,11 +123,9 @@ public class UsersController : ControllerBase
         user.IsActive = false;
         await _userService.UpdateAsync(user);
 
-        _logger.LogInformation("User with ID {Id} deactivated.", id);
         return Ok(new { message = $"User {id} has been deactivated." });
     }
 
-    // PATCH api/users/5/role
     [HttpPatch("{id:int}/role")]
     public async Task<IActionResult> UpdateRole(int id, [FromBody] UpdateRoleRequest request)
     {
@@ -135,10 +140,19 @@ public class UsersController : ControllerBase
         user.Role = request.Role;
         await _userService.UpdateAsync(user);
 
-        _logger.LogInformation("User with ID {Id} role updated to {Role}.", id, request.Role);
         return Ok(new { message = $"User {id} role updated to '{request.Role}'." });
     }
-}
 
-// Small DTO for the role update endpoint
-public record UpdateRoleRequest(string Role);
+    // Helper mapper to keep controllers cleaner (or use AutoMapper)
+    private static UserResponseDto MapToResponseDto(User user) => new()
+    {
+        Id = user.Id,
+        Username = user.Username,
+        Email = user.Email,
+        FirstName = user.FirstName,
+        LastName = user.LastName,
+        Phone = user.Phone,
+        IsActive = user.IsActive,
+        Role = user.Role
+    };
+}

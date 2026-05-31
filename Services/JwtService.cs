@@ -2,32 +2,52 @@
 using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using LibraryWebAPI.Models;
+using System;
 
 namespace LibraryWebAPI.Services
 {
     public interface IJwtService
     {
-        string GenerateToken(string username, string roll);
+        string GenerateToken(User user);
     }
+
     public class JwtService : IJwtService
     {
-        private readonly string key = "ThisIsMySuperSecretKey1234567ThisIsMySuperSecretKey1234567";
+        private readonly IConfiguration _configuration;
 
-        public string GenerateToken(string username, string roll)
+        public JwtService(IConfiguration configuration)
         {
+            _configuration = configuration;
+        }
+
+        public string GenerateToken(User user)
+        {
+            var key = _configuration["JwtSettings:SecretKey"]!;
+            var issuer = _configuration["JwtSettings:Issuer"];
+            var audience = _configuration["JwtSettings:Audience"];
+
+            // THE FIX: We are ignoring the config file and forcing it to live for 7 days!
+            var expiryDays = 7;
+
             var claims = new[]
             {
-            new Claim(ClaimTypes.Name, username),
-            new Claim(ClaimTypes.Role, roll)
-
-        };
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name,           user.Username),
+                new Claim(ClaimTypes.Email,          user.Email),
+                new Claim(ClaimTypes.Role,           user.Role),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            };
 
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
+                issuer: issuer,
+                audience: audience,
                 claims: claims,
-                expires: DateTime.Now.AddMinutes(30),
+                // THE FIX: Set to AddDays(expiryDays) to guarantee a future date
+                expires: DateTime.UtcNow.AddDays(expiryDays),
                 signingCredentials: credentials
             );
 
@@ -35,5 +55,3 @@ namespace LibraryWebAPI.Services
         }
     }
 }
-
-

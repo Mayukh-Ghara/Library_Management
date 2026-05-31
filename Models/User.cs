@@ -33,5 +33,8 @@ namespace LibraryWebAPI.Models
 
         [Column("role")]
         public string Role { get; set; } = "user";
+
+        public ICollection<Borrowing>? Borrowings { get; set; }  
+        public ICollection<Review>? Reviews { get; set; }        
     }
 }
