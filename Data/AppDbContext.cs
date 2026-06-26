@@ -1,5 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
-using LibraryWebAPI.Models;
+﻿using LibraryWebAPI.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace LibraryWebAPI.Data
 {
@@ -13,7 +13,8 @@ namespace LibraryWebAPI.Data
         public DbSet<Book> Books { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Borrowing> Borrowings { get; set; }
-        public DbSet<Review> Reviews { get; set; } // 🆕
+        public DbSet<Review> Reviews { get; set; }
+        public DbSet<BookCount> BookCounts { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
