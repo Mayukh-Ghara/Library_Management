@@ -2,14 +2,9 @@
 
 namespace LibraryWebAPI.Data
 {
-    public class UserDbContext
+    public class UserDbContext(IConfiguration configuration)
     {
-        private readonly string _connectionString;
-
-        public UserDbContext(IConfiguration configuration)
-        {
-            _connectionString = configuration.GetConnectionString("DefaultConnection");
-        }
+        private readonly string _connectionString = configuration.GetConnectionString("DefaultConnection");
 
         public MySqlConnection CreateConnection()
         {

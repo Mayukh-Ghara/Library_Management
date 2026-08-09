@@ -1,144 +1,87 @@
-﻿using System.Data;
-using System.Data.Common;
-using LibraryWebAPI.Data;
+﻿using Dapper;
 using LibraryWebAPI.Models;
-using MySql.Data.MySqlClient;
+using MySqlConnector;
 
-namespace LibraryWebAPI.Services
+namespace LibraryWebAPI.Services;
+
+public class UserService
 {
-    public class UserService
+    private readonly string _connectionString;
+
+    public UserService(IConfiguration config)
     {
-        private readonly UserDbContext _context;
+        _connectionString = config.GetConnectionString("DefaultConnection")!;
+    }
 
-        public UserService(UserDbContext context)
-        {
-            _context = context;
-        }
+    private MySqlConnection CreateConnection() => new(_connectionString);
 
-        // CREATE
-        public async Task<User> CreateUser(User user)
-        {
-            using var conn = _context.CreateConnection();
-            await conn.OpenAsync();
+    private const string BaseSelect = """
+        SELECT
+            id             AS Id,
+            username       AS Username,
+            email          AS Email,
+            password_hash  AS PasswordHash,
+            first_name     AS FirstName,
+            last_name      AS LastName,
+            phone          AS Phone,
+            is_active      AS IsActive,
+            role           AS Role
+        FROM users
+        """;
 
-            string query = @"INSERT INTO users 
-                                (username, email, password_hash, first_name, last_name, phone, is_active, role)
-                             VALUES 
-                                (@username, @email, @passwordHash, @firstName, @lastName, @phone, @isActive, @role);
-                             SELECT LAST_INSERT_ID();";
+    public async Task<IEnumerable<User>> GetAllAsync()
+    {
+        using var conn = CreateConnection();
+        return await conn.QueryAsync<User>(BaseSelect);
+    }
 
-            using var cmd = new MySqlCommand(query, conn);
-            cmd.Parameters.AddWithValue("@username", user.Username);
-            cmd.Parameters.AddWithValue("@email", user.Email);
-            cmd.Parameters.AddWithValue("@passwordHash", user.PasswordHash);
-            cmd.Parameters.AddWithValue("@firstName", user.FirstName);
-            cmd.Parameters.AddWithValue("@lastName", user.LastName);
-            cmd.Parameters.AddWithValue("@phone", user.Phone);
-            cmd.Parameters.AddWithValue("@isActive", user.IsActive);
-            cmd.Parameters.AddWithValue("@role", user.Role);
+    public async Task<User?> GetByIdAsync(int id)
+    {
+        var sql = $"{BaseSelect} WHERE id = @Id";
+        using var conn = CreateConnection();
+        return await conn.QueryFirstOrDefaultAsync<User>(sql, new { Id = id });
+    }
 
-            var newId = await cmd.ExecuteScalarAsync();
-            user.Id = Convert.ToInt32(newId);
-            return user;
-        }
+    public async Task<User?> GetByEmailAsync(string email)
+    {
+        var sql = $"{BaseSelect} WHERE email = @Email";
+        using var conn = CreateConnection();
+        return await conn.QueryFirstOrDefaultAsync<User>(sql, new { Email = email });
+    }
 
-        // READ - Get All Users
-        public async Task<List<User>> GetAllUsers()
-        {
-            var users = new List<User>();
+    public async Task<int> CreateAsync(User user)
+    {
+        const string sql = """
+            INSERT INTO users (username, email, password_hash, first_name, last_name, phone, is_active, role)
+            VALUES (@Username, @Email, @PasswordHash, @FirstName, @LastName, @Phone, @IsActive, @Role);
+            SELECT LAST_INSERT_ID();
+            """;
+        using var conn = CreateConnection();
+        return await conn.ExecuteScalarAsync<int>(sql, user);
+    }
 
-            using var conn = _context.CreateConnection();
-            await conn.OpenAsync();
+    public async Task<bool> UpdateAsync(User user)
+    {
+        const string sql = """
+            UPDATE users
+            SET
+                username   = @Username,
+                email      = @Email,
+                first_name = @FirstName,
+                last_name  = @LastName,
+                phone      = @Phone,
+                is_active  = @IsActive,
+                role       = @Role
+            WHERE id = @Id
+            """;
+        using var conn = CreateConnection();
+        return await conn.ExecuteAsync(sql, user) > 0;
+    }
 
-            string query = "SELECT * FROM users";
-            using var cmd = new MySqlCommand(query, conn);
-            using var reader = await cmd.ExecuteReaderAsync();
-
-            while (await reader.ReadAsync())
-                users.Add(MapUser(reader));
-
-            return users;
-        }
-
-        // READ - Get User By ID
-        public async Task<User?> GetUserById(int id)
-        {
-            using var conn = _context.CreateConnection();
-            await conn.OpenAsync();
-
-            string query = "SELECT * FROM users WHERE id = @id";
-            using var cmd = new MySqlCommand(query, conn);
-            cmd.Parameters.AddWithValue("@id", id);
-
-            using var reader = await cmd.ExecuteReaderAsync();
-            if (await reader.ReadAsync())
-                return MapUser(reader);
-
-            return null;
-        }
-
-        // UPDATE
-        public async Task<User?> UpdateUser(int id, User updatedUser)
-        {
-            using var conn = _context.CreateConnection();
-            await conn.OpenAsync();
-
-            string query = @"UPDATE users SET
-                                username   = @username,
-                                email      = @email,
-                                first_name = @firstName,
-                                last_name  = @lastName,
-                                phone      = @phone,
-                                is_active  = @isActive,
-                                role       = @role
-                             WHERE id = @id";
-
-            using var cmd = new MySqlCommand(query, conn);
-            cmd.Parameters.AddWithValue("@id", id);
-            cmd.Parameters.AddWithValue("@username", updatedUser.Username);
-            cmd.Parameters.AddWithValue("@email", updatedUser.Email);
-            cmd.Parameters.AddWithValue("@firstName", updatedUser.FirstName);
-            cmd.Parameters.AddWithValue("@lastName", updatedUser.LastName);
-            cmd.Parameters.AddWithValue("@phone", updatedUser.Phone);
-            cmd.Parameters.AddWithValue("@isActive", updatedUser.IsActive);
-            cmd.Parameters.AddWithValue("@role", updatedUser.Role);
-
-            int rowsAffected = await cmd.ExecuteNonQueryAsync();
-            if (rowsAffected == 0) return null;
-
-            updatedUser.Id = id;
-            return updatedUser;
-        }
-
-        // DELETE
-        public async Task<bool> DeleteUser(int id)
-        {
-            using var conn = _context.CreateConnection();
-            await conn.OpenAsync();
-
-            string query = "DELETE FROM users WHERE id = @id";
-            using var cmd = new MySqlCommand(query, conn);
-            cmd.Parameters.AddWithValue("@id", id);
-
-            int rowsAffected = await cmd.ExecuteNonQueryAsync();
-            return rowsAffected > 0;
-        }
-
-        // ── Helper: Map reader row → User object ──────────────────────────
-        private User MapUser(DbDataReader reader)
-        {
-            return new User
-            {
-                Id = reader.GetInt32("id"),
-                Username = reader.GetString("username"),
-                Email = reader.GetString("email"),
-                PasswordHash = reader.GetString("password_hash"),
-                FirstName = reader.IsDBNull(reader.GetOrdinal("first_name")) ? null : reader.GetString("first_name"),
-                LastName = reader.IsDBNull(reader.GetOrdinal("last_name")) ? null : reader.GetString("last_name"),
-                Phone = reader.IsDBNull(reader.GetOrdinal("phone")) ? null : reader.GetString("phone"),
-                IsActive = reader.GetBoolean("is_active"),
-                Role = reader.GetString("role")
-            };
-        }
+    public async Task<bool> DeleteAsync(int id)
+    {
+        const string sql = "DELETE FROM users WHERE id = @Id";
+        using var conn = CreateConnection();
+        return await conn.ExecuteAsync(sql, new { Id = id }) > 0;
     }
 }

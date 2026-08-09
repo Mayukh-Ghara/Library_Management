@@ -19,6 +19,9 @@ namespace LibraryWebAPI.Models
         public int PublishedYear { get; set; }
 
         public int CopiesAvailable { get; set; }
+
+        public ICollection<Borrowing>? Borrowings { get; set; }  
+        public ICollection<Review>? Reviews { get; set; }        
     }
     public class Book : BookBase
     {
