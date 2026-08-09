@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace LibraryWebAPI.Controllers
 {
-    [Authorize] 
+    [Authorize(Roles = "User")]
     [ApiController]
     [Route("api/[controller]")]
     public class BorrowingsController : ControllerBase

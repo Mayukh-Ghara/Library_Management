@@ -21,6 +21,7 @@ namespace LibraryWebAPI.Controllers
             this._bookService = bookService;
         }
 
+        [Authorize(Roles = "Admin, User")]
         [HttpGet]
         public async Task<IActionResult> GetBooks(
             [FromQuery] string search = "",
@@ -55,6 +56,7 @@ namespace LibraryWebAPI.Controllers
             return Ok(result);
         }
 
+        [Authorize(Roles = "Admin, User, admin, user")]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetBook(int id)
         {
@@ -70,6 +72,7 @@ namespace LibraryWebAPI.Controllers
             return Ok(book);
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<IActionResult> CreateBook(BookBase book)
         {
@@ -77,6 +80,7 @@ namespace LibraryWebAPI.Controllers
             return Ok(_book);
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateBook(int id, Book book)
         {
